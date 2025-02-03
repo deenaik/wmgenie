@@ -11,6 +11,7 @@ interface KanbanBoardProps {
 
 export function KanbanBoard({ todos, onUpdateTodo, onDeleteTodo }: KanbanBoardProps) {
   const [draggedItem, setDraggedItem] = useState<string | null>(null);
+  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
 
   console.log('Todos in KanbanBoard:', todos);
 
@@ -24,26 +25,55 @@ export function KanbanBoard({ todos, onUpdateTodo, onDeleteTodo }: KanbanBoardPr
 
   const handleDragStart = (e: DragEvent<HTMLDivElement>, todoId: string) => {
     console.log('Started dragging:', todoId);
+    e.currentTarget.classList.add('dragging');
     setDraggedItem(todoId);
-    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', todoId);
   };
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (e: DragEvent<HTMLDivElement>, status: string) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    e.stopPropagation();
+    setDragOverColumn(status);
+    const column = e.currentTarget;
+    column.classList.add('drag-over');
   };
 
-  const handleDrop = (e: DragEvent<HTMLDivElement>, status: string) => {
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    if (draggedItem) {
-      console.log('Dropping item:', draggedItem, 'into status:', status);
-      onUpdateTodo(draggedItem, status);
-      setDraggedItem(null);
+    e.stopPropagation();
+    setDragOverColumn(null);
+    const column = e.currentTarget;
+    column.classList.remove('drag-over');
+  };
+
+  const handleDrop = async (e: DragEvent<HTMLDivElement>, status: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const todoId = e.dataTransfer.getData('text/plain');
+    console.log('Dropping todo:', todoId, 'into status:', status);
+    
+    if (todoId) {
+      try {
+        await onUpdateTodo(todoId, status);
+        console.log('Drop successful');
+      } catch (error) {
+        console.error('Drop failed:', error);
+      }
     }
+    
+    setDraggedItem(null);
+    setDragOverColumn(null);
+    e.currentTarget.classList.remove('drag-over');
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (e: DragEvent<HTMLDivElement>) => {
+    e.currentTarget.classList.remove('dragging');
     setDraggedItem(null);
+    setDragOverColumn(null);
+    document.querySelectorAll('.kanban-column').forEach(column => {
+      column.classList.remove('drag-over');
+    });
   };
 
   return (
@@ -51,8 +81,9 @@ export function KanbanBoard({ todos, onUpdateTodo, onDeleteTodo }: KanbanBoardPr
       {Object.entries(columns).map(([status, items]) => (
         <div
           key={status}
-          className="kanban-column"
-          onDragOver={handleDragOver}
+          className={`kanban-column ${dragOverColumn === status ? 'drag-over' : ''}`}
+          onDragOver={(e) => handleDragOver(e, status)}
+          onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(e, status)}
         >
           <h2>{status}</h2>
@@ -62,8 +93,8 @@ export function KanbanBoard({ todos, onUpdateTodo, onDeleteTodo }: KanbanBoardPr
             items.map((todo) => (
               <div
                 key={todo.id}
-                className="kanban-item"
-                draggable
+                className={`kanban-item ${draggedItem === todo.id ? 'dragging' : ''}`}
+                draggable="true"
                 onDragStart={(e) => handleDragStart(e, todo.id)}
                 onDragEnd={handleDragEnd}
                 onClick={() => onDeleteTodo(todo.id)}

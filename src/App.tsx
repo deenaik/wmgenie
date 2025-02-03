@@ -35,14 +35,26 @@ function App() {
 
   async function updateTodoStatus(id: string, status: string) {
     try {
-      console.log('Updating todo:', id, 'to status:', status);
+      console.log('Starting update for todo:', id, 'new status:', status);
+      
+      // First, find the todo to update
+      const todoToUpdate = todos.find(todo => todo.id === id);
+      if (!todoToUpdate) {
+        console.error('Todo not found:', id);
+        return;
+      }
+
+      // Perform the update
       const updatedTodo = await client.models.Todo.update({
         id,
         status,
+        content: todoToUpdate.content // Preserve the existing content
       });
+      
       console.log('Update successful:', updatedTodo);
     } catch (error) {
       console.error('Error updating todo:', error);
+      throw error; // Re-throw to handle in the UI
     }
   }
 
